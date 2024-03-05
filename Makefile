@@ -12,5 +12,3 @@ start:
 selfcheck:
 	poetry check
 check: selfcheck lint
-test-coverage:
-	poetry run pytest --cov=page_analyzer --cov-report xml
