@@ -41,7 +41,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for id, url in urls %}
+                        {% for id, url, check_date, last_check_date in urls %}
                         <tr>
                             <td>{{id}}</td>
                             <td>
@@ -50,7 +50,7 @@
                                 </a>
                             </td>
 
-                            <td></td>
+                            <td>{{last_check_date}}</td>
 
 
                             <td></td>

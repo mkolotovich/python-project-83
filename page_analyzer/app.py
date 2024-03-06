@@ -26,17 +26,28 @@ def index_page():
     return render_template('index.html')
 
 
+def normalize_urls(url_item):
+    (id, url, check_date, last_check_date) = url_item
+    if (last_check_date is None):
+        updated_url = (id, url, check_date, '')
+        return updated_url
+    return url_item
+
+
 @app.get('/urls')
 def render_add_page():
     messages = get_flashed_messages(with_categories=True)
     if (messages):
         return render_template('index.html', messages=messages,)
     cursor = conn.cursor()
-    cursor.execute('SELECT id, name FROM urls')
+    cursor.execute("""SELECT urls.id, name, url_checks.created_at,
+                   MAX(url_checks.created_at) FROM urls LEFT JOIN
+                   url_checks ON urls.id=url_checks.url_id GROUP BY
+                   urls.id, url_checks.created_at ORDER BY urls.id DESC""")
     urls = cursor.fetchall()
-    urls.reverse()
+    normalized_urls = list(map(normalize_urls, urls))
     cursor.close()
-    return render_template('view_pages.html', urls=urls,)
+    return render_template('view_pages.html', urls=normalized_urls)
 
 
 @app.post('/urls')
@@ -73,11 +84,26 @@ def render_url_page(id):
     cursor = conn.cursor()
     cursor.execute('SELECT name FROM urls WHERE id=%s', (id,))
     url = cursor.fetchone()[0]
+    cursor.execute("""SELECT id, created_at FROM url_checks
+                   WHERE url_id=%s ORDER BY id DESC""",
+                   (id,))
+    checks = cursor.fetchall()
     cursor.close()
     messages = get_flashed_messages(with_categories=True)
     return render_template(
         'view_page.html',
         messages=messages,
         url=url,
-        id=id
+        id=id,
+        checks=checks
     )
+
+
+@app.post('/urls/<id>/checks')
+def check_page(id):
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO url_checks (url_id, created_at) VALUES (%s, %s);",
+        (id, date.today()))
+    flash('Страница успешно проверена', 'success')
+    return redirect(url_for('render_url_page', id=id))
