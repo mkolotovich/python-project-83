@@ -14,6 +14,7 @@ import requests
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 from datetime import date
+from bs4 import BeautifulSoup
 load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
 conn = psycopg2.connect(DATABASE_URL)
@@ -82,8 +83,9 @@ def render_url_page(id):
     cursor = conn.cursor()
     cursor.execute('SELECT name FROM urls WHERE id=%s', (id,))
     url = cursor.fetchone()[0]
-    cursor.execute("""SELECT id, status_code, created_at FROM url_checks
-                   WHERE url_id=%s ORDER BY id DESC""",
+    cursor.execute("""SELECT id, status_code, h1, title, description,
+                   created_at FROM url_checks WHERE url_id=%s
+                   ORDER BY id DESC""",
                    (id,))
     checks = cursor.fetchall()
     normalized_checks = list(map(normalize_data, checks))
@@ -105,9 +107,25 @@ def check_page(id):
     cursor.execute('SELECT name FROM urls WHERE id=%s', (id,))
     url = cursor.fetchone()[0]
     r = requests.get(url)
+    html = BeautifulSoup(r.text)
     cursor.execute(
         """INSERT INTO url_checks (url_id, status_code, created_at)
-          VALUES (%s, %s, %s);""",
+        VALUES (%s, %s, %s);""",
         (id, r.status_code, date.today()))
+    cursor.execute("SELECT id FROM url_checks")
+    ids = cursor.fetchall()
+    check_id = ids[len(ids) - 1][0]
+    if (html.h1):
+        cursor.execute(
+            "UPDATE url_checks SET h1=%s WHERE id=%s",
+            (html.h1.string, check_id))
+    if (html.title):
+        cursor.execute(
+            "UPDATE url_checks SET title=%s WHERE id=%s",
+            (html.title.string, check_id))
+    if (html.meta):
+        cursor.execute(
+            "UPDATE url_checks SET description=%s WHERE id=%s",
+            (html.find(attrs={"name": "description"})['content'], check_id))
     flash('Страница успешно проверена', 'success')
     return redirect(url_for('render_url_page', id=id))
