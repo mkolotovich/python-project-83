@@ -69,10 +69,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for id, date in checks %}
+                        {% for id, status_code, date in checks %}
                         <tr>
                             <td>{{id}}</td>
-                            <td></td>
+                            <td>{{status_code}}</td>
                             <td></td>
                             <td></td>
                             <td></td>

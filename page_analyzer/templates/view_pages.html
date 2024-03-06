@@ -41,7 +41,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for id, url, check_date, last_check_date in urls %}
+                        {% for id, url, last_check_date, status_code in urls %}
                         <tr>
                             <td>{{id}}</td>
                             <td>
@@ -53,7 +53,7 @@
                             <td>{{last_check_date}}</td>
 
 
-                            <td></td>
+                            <td>{{status_code}}</td>
 
                         </tr>
                         {% endfor %}
