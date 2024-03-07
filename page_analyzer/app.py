@@ -78,7 +78,7 @@ def add_page():
         return redirect(url_for('render_add_page'))
 
 
-@app.route('/urls/<id>')
+@app.route('/urls/<int:id>')
 def render_url_page(id):
     cursor = conn.cursor()
     cursor.execute('SELECT name FROM urls WHERE id=%s', (id,))
@@ -106,26 +106,31 @@ def check_page(id):
     cursor = conn.cursor()
     cursor.execute('SELECT name FROM urls WHERE id=%s', (id,))
     url = cursor.fetchone()[0]
-    r = requests.get(url)
-    html = BeautifulSoup(r.text)
-    cursor.execute(
-        """INSERT INTO url_checks (url_id, status_code, created_at)
-        VALUES (%s, %s, %s);""",
-        (id, r.status_code, date.today()))
-    cursor.execute("SELECT id FROM url_checks")
-    ids = cursor.fetchall()
-    check_id = ids[len(ids) - 1][0]
-    if (html.h1):
+    try:
+        r = requests.get(url)
+        html = BeautifulSoup(r.text)
         cursor.execute(
-            "UPDATE url_checks SET h1=%s WHERE id=%s",
-            (html.h1.string, check_id))
-    if (html.title):
-        cursor.execute(
-            "UPDATE url_checks SET title=%s WHERE id=%s",
-            (html.title.string, check_id))
-    if (html.meta):
-        cursor.execute(
-            "UPDATE url_checks SET description=%s WHERE id=%s",
-            (html.find(attrs={"name": "description"})['content'], check_id))
-    flash('Страница успешно проверена', 'success')
-    return redirect(url_for('render_url_page', id=id))
+            """INSERT INTO url_checks (url_id, status_code, created_at)
+            VALUES (%s, %s, %s);""",
+            (id, r.status_code, date.today()))
+        cursor.execute("SELECT id FROM url_checks")
+        ids = cursor.fetchall()
+        check_id = ids[len(ids) - 1][0]
+        if (html.h1):
+            cursor.execute(
+                "UPDATE url_checks SET h1=%s WHERE id=%s",
+                (html.h1.string, check_id))
+        if (html.title):
+            cursor.execute(
+                "UPDATE url_checks SET title=%s WHERE id=%s",
+                (html.title.string, check_id))
+        if (html.meta):
+            cursor.execute(
+                "UPDATE url_checks SET description=%s WHERE id=%s",
+                (html.find(attrs={"name": "description"})['content'],
+                 check_id))
+        flash('Страница успешно проверена', 'success')
+        return redirect(url_for('render_url_page', id=id))
+    except Exception:
+        flash('Произошла ошибка при проверке', 'danger')
+        return redirect(url_for('render_url_page', id=id))
