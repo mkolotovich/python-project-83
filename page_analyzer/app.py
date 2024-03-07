@@ -17,8 +17,8 @@ from datetime import date
 from bs4 import BeautifulSoup
 load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
-conn = psycopg2.connect(DATABASE_URL)
-conn.autocommit = True
+# conn = psycopg2.connect(DATABASE_URL)
+# conn.autocommit = True
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
@@ -38,12 +38,14 @@ def render_add_page():
     messages = get_flashed_messages(with_categories=True)
     if (messages):
         return render_template('index.html', messages=messages)
+    conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor() as cursor:
         cursor.execute("""SELECT urls.id, urls.name, MAX(url_checks.created_at)
                       , MAX(status_code) FROM urls LEFT JOIN url_checks ON
                       urls.id=url_checks.url_id GROUP BY urls.id ORDER BY
                       urls.id DESC""")
         urls = cursor.fetchall()
+        conn.commit()
         normalized_urls = list(map(normalize_data, urls))
     return render_template('view_pages.html', urls=normalized_urls)
 
@@ -80,6 +82,7 @@ def add_page():
 
 @app.route('/urls/<int:id>')
 def render_url_page(id):
+    conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor() as cursor:
         cursor.execute('SELECT name, created_at FROM urls WHERE id=%s', (id,))
         url, date = cursor.fetchone()
@@ -87,6 +90,7 @@ def render_url_page(id):
                     created_at FROM url_checks WHERE url_id=%s
                     ORDER BY id DESC""", (id,))
         checks = cursor.fetchall()
+        conn.commit()
         normalized_checks = list(map(normalize_data, checks))
         messages = get_flashed_messages(with_categories=True)
         return render_template(
