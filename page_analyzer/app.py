@@ -37,7 +37,7 @@ def normalize_data(item):
 def render_add_page():
     messages = get_flashed_messages(with_categories=True)
     if (messages):
-        return render_template('index.html', messages=messages,)
+        return render_template('index.html', messages=messages)
     cursor = conn.cursor()
     cursor.execute("""SELECT urls.id, urls.name, MAX(url_checks.created_at),
                       MAX(status_code) FROM urls LEFT JOIN url_checks ON
@@ -75,7 +75,8 @@ def add_page():
         return redirect(url_for('render_url_page', id=id[0]))
     else:
         flash('Некорректный URL', 'error')
-        return redirect(url_for('render_add_page'))
+        messages = get_flashed_messages(with_categories=True)
+        return render_template('index.html', messages=messages), 422
 
 
 @app.route('/urls/<int:id>')
