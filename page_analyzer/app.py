@@ -82,8 +82,8 @@ def add_page():
 @app.route('/urls/<int:id>')
 def render_url_page(id):
     cursor = conn.cursor()
-    cursor.execute('SELECT name FROM urls WHERE id=%s', (id,))
-    url = cursor.fetchone()[0]
+    cursor.execute('SELECT name, created_at FROM urls WHERE id=%s', (id,))
+    url, date = cursor.fetchone()
     cursor.execute("""SELECT id, status_code, h1, title, description,
                    created_at FROM url_checks WHERE url_id=%s
                    ORDER BY id DESC""",
@@ -98,11 +98,12 @@ def render_url_page(id):
         messages=messages,
         url=url,
         id=id,
+        date=date,
         checks=normalized_checks
     )
 
 
-@app.post('/urls/<id>/checks')
+@app.post('/urls/<int:id>/checks')
 def check_page(id):
     cursor = conn.cursor()
     cursor.execute('SELECT name FROM urls WHERE id=%s', (id,))
