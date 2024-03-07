@@ -109,29 +109,33 @@ def check_page(id):
     url = cursor.fetchone()[0]
     try:
         r = requests.get(url)
-        html = BeautifulSoup(r.text)
-        cursor.execute(
-            """INSERT INTO url_checks (url_id, status_code, created_at)
-            VALUES (%s, %s, %s);""",
-            (id, r.status_code, date.today()))
-        cursor.execute("SELECT id FROM url_checks")
-        ids = cursor.fetchall()
-        check_id = ids[len(ids) - 1][0]
-        if (html.h1):
+        if (r.status_code == 200):
+            html = BeautifulSoup(r.text)
             cursor.execute(
-                "UPDATE url_checks SET h1=%s WHERE id=%s",
-                (html.h1.string, check_id))
-        if (html.title):
-            cursor.execute(
-                "UPDATE url_checks SET title=%s WHERE id=%s",
-                (html.title.string, check_id))
-        if (html.meta):
-            cursor.execute(
-                "UPDATE url_checks SET description=%s WHERE id=%s",
-                (html.find(attrs={"name": "description"})['content'],
-                 check_id))
-        flash('Страница успешно проверена', 'success')
-        return redirect(url_for('render_url_page', id=id))
+                """INSERT INTO url_checks (url_id, status_code, created_at)
+                VALUES (%s, %s, %s);""",
+                (id, r.status_code, date.today()))
+            cursor.execute("SELECT id FROM url_checks")
+            ids = cursor.fetchall()
+            check_id = ids[len(ids) - 1][0]
+            if (html.h1):
+                cursor.execute(
+                    "UPDATE url_checks SET h1=%s WHERE id=%s",
+                    (html.h1.string, check_id))
+            if (html.title):
+                cursor.execute(
+                    "UPDATE url_checks SET title=%s WHERE id=%s",
+                    (html.title.string, check_id))
+            if (html.meta):
+                cursor.execute(
+                    "UPDATE url_checks SET description=%s WHERE id=%s",
+                    (html.find(attrs={"name": "description"})['content'],
+                     check_id))
+            flash('Страница успешно проверена', 'success')
+            return redirect(url_for('render_url_page', id=id))
+        else:
+            flash('Произошла ошибка при проверке', 'danger')
+            return redirect(url_for('render_url_page', id=id))
     except Exception:
         flash('Произошла ошибка при проверке', 'danger')
         return redirect(url_for('render_url_page', id=id))
