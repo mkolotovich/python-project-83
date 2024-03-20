@@ -33,9 +33,6 @@ def normalize_data(item):
 
 @app.get('/urls')
 def render_add_page():
-    messages = get_flashed_messages(with_categories=True)
-    if (messages):
-        return render_template('index.html', messages=messages)
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor() as cursor:
         cursor.execute("""SELECT urls.id, urls.name, MAX(url_checks.created_at)
@@ -51,28 +48,30 @@ def render_add_page():
 def add_page():
     url = request.form.to_dict().get('url', '')
     url_max_len = 255
+    if (len(url) > url_max_len):
+        flash('URL превышает 255 символов', 'error')
+        messages = get_flashed_messages(with_categories=True)
+        return render_template('index.html', messages=messages), 422
     parsed_url = urlparse(url)
     normalized_url = f"{parsed_url.scheme}://{parsed_url.hostname}"
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor() as cursor:
         cursor.execute('SELECT id FROM urls WHERE name=%s', (normalized_url,))
         id = cursor.fetchone()
-        if (validators.url(url) and len(url) <= url_max_len and not id):
-            cursor.execute(
-                "INSERT INTO urls (name, created_at) VALUES (%s, %s);",
-                (normalized_url, date.today()))
-            cursor.execute('SELECT id FROM urls WHERE name=%s',
-                           (normalized_url,))
-            id = cursor.fetchone()[0]
-            conn.commit()
-            flash('Страница успешно добавлена', 'success')
-            return redirect(url_for('render_url_page', id=id))
-        elif (len(url) > url_max_len):
-            flash('URL превышает 255 символов', 'error')
-            return redirect(url_for('render_add_page'))
-        elif (id):
-            flash('Страница уже существует', 'info')
-            return redirect(url_for('render_url_page', id=id[0]))
+        if (validators.url(url)):
+            if (not id):
+                cursor.execute(
+                    "INSERT INTO urls (name, created_at) VALUES (%s, %s);",
+                    (normalized_url, date.today()))
+                cursor.execute('SELECT id FROM urls WHERE name=%s',
+                               (normalized_url,))
+                id = cursor.fetchone()[0]
+                conn.commit()
+                flash('Страница успешно добавлена', 'success')
+                return redirect(url_for('render_url_page', id=id))
+            else:
+                flash('Страница уже существует', 'info')
+                return redirect(url_for('render_url_page', id=id[0]))
         else:
             flash('Некорректный URL', 'error')
             messages = get_flashed_messages(with_categories=True)
@@ -113,25 +112,12 @@ def check_page(id):
             if (r.status_code == 200):
                 html = BeautifulSoup(r.text)
                 cursor.execute(
-                    """INSERT INTO url_checks (url_id, status_code, created_at)
-                    VALUES (%s, %s, %s);""",
-                    (id, r.status_code, date.today()))
-                cursor.execute("SELECT id FROM url_checks")
-                ids = cursor.fetchall()
-                check_id = ids[len(ids) - 1][0]
-                if (html.h1):
-                    cursor.execute(
-                        "UPDATE url_checks SET h1=%s WHERE id=%s",
-                        (html.h1.string, check_id))
-                if (html.title):
-                    cursor.execute(
-                        "UPDATE url_checks SET title=%s WHERE id=%s",
-                        (html.title.string, check_id))
-                if (html.meta):
-                    cursor.execute(
-                        "UPDATE url_checks SET description=%s WHERE id=%s",
-                        (html.find(attrs={"name": "description"})['content'],
-                         check_id))
+                    """INSERT INTO url_checks
+                    (url_id, status_code, h1, title, description, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s);""",
+                    (id, r.status_code, html.h1.string, html.title.string,
+                     html.find(attrs={"name": "description"})['content'],
+                     date.today()))
                 flash('Страница успешно проверена', 'success')
                 return redirect(url_for('render_url_page', id=id))
             else:
