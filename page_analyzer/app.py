@@ -48,34 +48,32 @@ def render_add_page():
 def add_page():
     url = request.form.to_dict().get('url', '')
     url_max_len = 255
-    if (len(url) > url_max_len):
-        flash('URL превышает 255 символов', 'error')
-        messages = get_flashed_messages(with_categories=True)
-        return render_template('index.html', messages=messages), 422
     parsed_url = urlparse(url)
     normalized_url = f"{parsed_url.scheme}://{parsed_url.hostname}"
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor() as cursor:
         cursor.execute('SELECT id FROM urls WHERE name=%s', (normalized_url,))
         id = cursor.fetchone()
-        if (validators.url(url)):
-            if (not id):
-                cursor.execute(
-                    "INSERT INTO urls (name, created_at) VALUES (%s, %s);",
-                    (normalized_url, date.today()))
-                cursor.execute('SELECT id FROM urls WHERE name=%s',
-                               (normalized_url,))
-                id = cursor.fetchone()[0]
-                conn.commit()
-                flash('Страница успешно добавлена', 'success')
-                return redirect(url_for('render_url_page', id=id))
+        if (not validators.url(url) or len(url) > url_max_len):
+            if (len(url) > url_max_len):
+                flash('URL превышает 255 символов', 'error')
             else:
-                flash('Страница уже существует', 'info')
-                return redirect(url_for('render_url_page', id=id[0]))
-        else:
-            flash('Некорректный URL', 'error')
+                flash('Некорректный URL', 'error')
             messages = get_flashed_messages(with_categories=True)
             return render_template('index.html', messages=messages), 422
+        if (not id):
+            cursor.execute(
+                "INSERT INTO urls (name, created_at) VALUES (%s, %s);",
+                (normalized_url, date.today()))
+            cursor.execute('SELECT id FROM urls WHERE name=%s',
+                           (normalized_url,))
+            id = cursor.fetchone()[0]
+            conn.commit()
+            flash('Страница успешно добавлена', 'success')
+            return redirect(url_for('render_url_page', id=id))
+        else:
+            flash('Страница уже существует', 'info')
+            return redirect(url_for('render_url_page', id=id[0]))
 
 
 @app.route('/urls/<int:id>')
@@ -109,7 +107,7 @@ def check_page(id):
         url = cursor.fetchone()[0]
         try:
             r = requests.get(url)
-            if (r.status_code == 200):
+            if (not r.raise_for_status()):
                 html = BeautifulSoup(r.text)
                 cursor.execute(
                     """INSERT INTO url_checks
